@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-model href="/usr/share/php5/PEAR/data/phing/etc/phing-grammar.rng"
+		type="application/xml"
+		schematypens="http://relaxng.org/ns/structure/1.0" ?>
+
+<project name="aws-deploy" default="deploy.deploy"
+         description="Pack, upload and unpack actions.">
+	<target name="deploy.assets.prepare" depends="assets.build"
+	        description="Pack assets for uploading.">
+		<property name="deploy.tarball" override="true"
+		          value="assets-${revision}.tar.gz" />
+		<php function="str_replace" returnProperty="deploy.tarball" >
+			<param value="/" />
+			<param value="-" />
+			<param value="${deploy.tarball}" />
+		</php>
+		
+		<tar destfile="${dir.build}/tarballs/${deploy.tarball}" compression="gzip" includeemptydirs="true">
+			<fileset refid="assets" />
+		</tar>
+	</target>
+	
+	<target name="deploy.assets" depends="deploy.assets.prepare"
+	        description="Upload &amp; unpack assets.">
+		<property name="deploy.path" value="${deploy.assets.tmp}" override="true" />
+		<property name="deploy.dest" value="${deploy.assets.dest}" override="true" />
+		<foreach list="${deploy.assets.servers}" param="deploy.server" target="deploy.deploy" />
+	</target>
+	
+	<target name="deploy.engine.prepare" depends="engine.build, assets.build"
+	        description="Pack engine and framework for uploading.">
+		<property name="deploy.tarball" override="true"
+		          value="engine-${revision}.tar.gz" />
+		<php function="str_replace" returnProperty="deploy.tarball" >
+			<param value="/" />
+			<param value="-" />
+			<param value="${deploy.tarball}" />
+		</php>
+		
+		<tar destfile="${dir.build}/tarballs/${deploy.tarball}" compression="gzip" includeemptydirs="true">
+			<fileset refid="engine" />
+			<fileset refid="framework" />
+		</tar>
+	</target>
+	
+	<target name="deploy.engine" depends="deploy.engine.prepare"
+	        description="Upload &amp; unpack engine and framework.">
+		<property name="deploy.path" value="${deploy.${target}.tmp}" override="true" />
+		<property name="deploy.dest" value="${deploy.${target}.dest}" override="true" />
+		<foreach list="${deploy.${target}.servers}" param="deploy.server" target="deploy.deploy" />
+		
+		<foreach list="${deploy.${target}.servers}" param="deploy.server" target="deploy.engine.after" />
+	</target>
+	
+	<target name="deploy.engine.after"
+	        description="Post-deploy actions for AWS Engine.">
+		<!-- create the protected/runtime directory for Yii -->
+		<netssh username="${deploy.user}"
+		        pubkeyfile="${project.basedir}/${deploy.pubkeyfile}"
+		        privkeyfile="${project.basedir}/${deploy.privkeyfile}"
+		        host="${deploy.server}"
+		        sshlib="${deploy.sshlib}"
+		        command="mkdir -p ${deploy.dest}${deploy.ds}protected${deploy.ds}runtime;
+		                 chmod 777 ${deploy.dest}${deploy.ds}protected${deploy.ds}runtime" />
+	</target>
+	
+	<target name="deploy.transfer"
+	        description="Upload tarball.">
+		<echo msg="uploading: ${dir.build}/tarballs/${deploy.tarball}" />
+		
+		<echo msg="to server: ${deploy.server}" />
+		
+		<echo msg="to target: ${deploy.path}${deploy.ds}" />
+		
+		<netscp username="${deploy.user}"
+		        pubkeyfile="${project.basedir}/${deploy.pubkeyfile}"
+		        privkeyfile="${project.basedir}/${deploy.privkeyfile}"
+		        host="${deploy.server}"
+		        sshlib="${deploy.sshlib}"
+		        todir="${deploy.path}${deploy.ds}"
+		        file="${dir.build}/tarballs/${deploy.tarball}" />
+	</target>
+	
+	<target name="deploy.deploy" depends="deploy.transfer"
+	        description="Upload and unpack tarball.">
+		<!-- unpack tarball -->
+		<echo msg="unpacking: ${deploy.path}${deploy.ds}${deploy.tarball}
+		           to remote location: ${deploy.server}:
+		           ${deploy.dest}${deploy.ds}" />
+		
+		<netssh username="${deploy.user}"
+		        pubkeyfile="${project.basedir}/${deploy.pubkeyfile}"
+		        privkeyfile="${project.basedir}/${deploy.privkeyfile}"
+		        host="${deploy.server}"
+		        sshlib="${deploy.sshlib}"
+		        command="tar -xvf ${deploy.path}${deploy.ds}${deploy.tarball} --directory=${deploy.dest}${deploy.ds}" />
+		
+		<!-- delete tarball -->
+		<echo msg="deleting tarball: ${deploy.path}${deploy.ds}${deploy.tarball}" />
+		
+		<netssh username="${deploy.user}"
+		        pubkeyfile="${project.basedir}/${deploy.pubkeyfile}"
+		        privkeyfile="${project.basedir}/${deploy.privkeyfile}"
+		        host="${deploy.server}"
+		        sshlib="${deploy.sshlib}"
+		        command="rm ${deploy.path}${deploy.ds}${deploy.tarball}" />
+	</target>
+</project>

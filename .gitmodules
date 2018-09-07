@@ -1,0 +1,9 @@
+[submodule "yii"]
+	path = yii
+	url = git@github.com:yiisoft/yii.git
+[submodule "configs"]
+	path = configs
+	url = git@github.com:allwomenstalk/configs.git
+[submodule "vendor/Phingistrano"]
+	path = vendor/Phingistrano
+	url = https://github.com/CodeMeme/Phingistrano.git

@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-model href="/usr/share/php5/PEAR/data/phing/etc/phing-grammar.rng"
+		type="application/xml"
+		schematypens="http://relaxng.org/ns/structure/1.0" ?>
+
+<project name="aws-prepare" default="prepare.checkout"
+         description="Pre-build actions.">
+	<target name="prepare.precache">
+		<property name="cacheexists" value="false" />
+		<available file="${dir.root}"
+		           property="cacheexists"
+		           value="true" />
+		
+		<if>
+			<isfalse value="${cacheexists}"/>
+			<then>
+				<!-- create required directories -->
+				<mkdir dir="${dir.build}" />
+				<mkdir dir="${dir.build}/tarballs" />
+				<mkdir dir="${dir.build}/logs/deploy" />
+				
+				<!-- clone repository -->
+				<exec outputProperty="cloneresult"
+				      command="git clone --depth 1 ${deploy.repository}
+				               ${dir.root}" />
+				
+				<echo msg="${cloneresult}" />
+				
+				<!-- Init Submodules -->
+				<exec outputProperty="submoduleinitresult"
+				      dir="${dir.root}"
+				      command="git submodule init" />
+				
+				<echo msg="${submoduleinitresult}"/>
+			</then>
+		</if>
+	</target>
+	
+	<target name="prepare.checkout" depends="prepare.precache"
+	        description="Fetch and checkout target revision.">
+		<!-- fetch origin -->
+		<exec dir="${dir.root}"
+		      outputProperty="fetchresult"
+		      command="git fetch origin"
+		      checkreturn="true" />
+		
+		<!-- determine revision from latest tag -->
+		<if>
+			<not>
+				<isset property="revision" />
+			</not>
+			<then>
+				<gitdescribe repository="${dir.root}"
+				             abbrev="0"
+				             committish="origin/master"
+				             outputProperty="revision" />
+				<echo message="Latest revision is ${revision}" />
+			</then>
+		</if>
+		
+		<!-- checkout revision -->
+		
+		<echo msg="Checking out ${revision}" />
+		
+		<exec dir="${dir.root}"
+		      outputProperty="checkoutresult"
+		      command="git checkout -f ${revision}"
+		      checkreturn="true" />
+		
+		<echo msg="${checkoutresult}" />
+		
+		<exec outputProperty="submodulesyncresult"
+		      dir="${dir.root}"
+		      command="for mod in `git submodule status | awk '{ print $2 }'`; do
+		                git config -f .git/config submodule.&#36;{mod}.url
+		                `git config -f .gitmodules --get submodule.&#36;{mod}.url`;
+		               done;" />
+		
+		<!-- Update Submodules -->
+		<exec outputProperty="submoduleupdateresult"
+		      dir="${dir.root}"
+		      command="git submodule update"
+		      checkreturn="true" />
+		
+		<!-- determine version -->
+		<php returnProperty="version"
+		     expression="false;
+		     $config = file_get_contents('${dir.root}/protected/config/main.php');
+		     $matches = array();
+		     $r = preg_match('#define\(\'AWS_VERSION\', \'(.*?)\'\);#', $config, $matches);
+		     if ($r &amp;&amp; isset($matches[1]))
+		         $retval = $matches[1]; //hack for evaluation of arbitrary code
+		     else
+		         $retval = false;" />
+		<if>
+			<equals arg1="${version}" arg2="false" />
+			<then>
+				<fail message="Can't determine version." />
+			</then>
+		</if>
+		<echo message="Version is ${version}" />
+	</target>
+	
+	<target name="prepare.cleanup"
+	        description="Delete temporary files.">
+		<delete includeemptydirs="true">
+			<fileset dir="${dir.build}" defaultexcludes="false">
+				<include name="tarballs/**/*" />
+			</fileset>
+			<fileset dir="${dir.root}" defaultexcludes="false">
+				<include name="assets/**/*" />
+			</fileset>
+		</delete>
+	</target>
+</project>

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-model href="/usr/share/php5/PEAR/data/phing/etc/phing-grammar.rng"
+		type="application/xml"
+		schematypens="http://relaxng.org/ns/structure/1.0" ?>
+
+<project name="aws-engine" default="build">
+	<!-- Required properties -->
+	<property name="phingistrano.dir"  value="${project.basedir}/vendor/Phingistrano/phingistrano" />
+	<property name="dir.build"      value="${project.basedir}/.build" /> <!-- build directory -->
+	<property name="dir.root"        value="${dir.build}/cached-copy" /> <!-- working copy -->
+	<property name="dir.assets"      value="${dir.root}/assets" /> <!-- directory to build assets -->
+	<property name="deploy.repository" value="git@github.com:allwomenstalk/${phing.project.name}.git" />
+	
+	<property file="configs/phing/build.properties" />
+	
+	<!-- assets to minify -->
+	<filelist id="min-styles" dir="${dir.root}/css" listfile="${dir.root}/protected/config/styles.txt" />
+	<filelist id="min-scripts" dir="${dir.root}/js" listfile="${dir.root}/protected/config/scripts.txt" />
+	<!-- assets not to minify - all files except those in minify lists -->
+	<fileset id="styles" dir="${dir.root}/css" excludesfile="${dir.root}/protected/config/styles.txt" />
+	<fileset id="scripts" dir="${dir.root}/js" excludesfile="${dir.root}/protected/config/scripts.txt" />
+	
+	<!-- assets to deploy -->
+	<fileset id="assets" dir="${dir.root}/assets" />
+	
+	<!-- engine itself and framework production files -->
+	<fileset id="engine" dir="${dir.root}" casesensitive="false">
+		<exclude name="build.xml" />
+		<exclude name="build/**" />
+		<exclude name="index-test.php" />
+		<!-- here should be vendor/Phingistrano/** , but due to Phing bug (?)
+		     (exclude tag doesn't work if excluded directory is the only child of its parent)
+		     we use only vendor/** -->
+		<exclude name="vendor/**" />
+		<exclude name="protected/runtime/**" />
+		<exclude name="yii/**" />
+		<exclude name="configs/**" />
+	</fileset>
+	<fileset id="framework" dir="${dir.root}">
+		<include name="yii/framework" />
+	</fileset>
+	
+	<!-- Imports -->
+	<import file="${phingistrano.dir}/deploy/build.xml" />
+	<import file="${phingistrano.dir}/version/build.xml" />
+	<import file="${phingistrano.dir}/sniff/build.xml" />
+	<import file="${phingistrano.dir}/docs/build.xml" />
+	<import file="${phingistrano.dir}/test/build.xml" />
+	<import file="${phingistrano.dir}/rollback/build.xml" />
+	<import file="${phingistrano.dir}/tunnel/build.xml" />
+
+	<import file="build/prepare.xml" />
+	<import file="build/assets.xml" />
+	<import file="build/deploy.xml" />
+	
+	<target name="engine.build" depends="prepare.checkout"
+	        description="Build engine.">
+		
+	</target>
+	
+	<target name="build" depends="prepare.cleanup, deploy.assets, deploy.engine"
+	        description="Build and deploy all.">
+		<phingcall target="prepare.cleanup" />
+	</target>
+	
+</project>

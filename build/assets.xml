@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-model href="/usr/share/php5/PEAR/data/phing/etc/phing-grammar.rng"
+		type="application/xml"
+		schematypens="http://relaxng.org/ns/structure/1.0" ?>
+
+<project name="aws-engine" default="assets.build"
+         description="Assets build actions.">
+	<target name="assets.build" depends="prepare.checkout"
+	        description="Combine &amp; minify assets.">
+		<mkdir dir="${dir.assets}" />
+		
+		<!-- cleanup -->
+		<delete includeemptydirs="true">
+			<fileset dir="${dir.root}" defaultexcludes="false">
+				<include name="assets/**/*" />
+			</fileset>
+		</delete>
+		
+		<!-- combine css -->
+		<append destFile="${dir.assets}/all.css">
+			<filelist refid="min-styles" />
+		</append>
+		
+		<!-- minify css -->
+		<echo message="Compressing CSS to ${dir.assets}/all-${version}.min.css" />
+		<exec dir="${dir.root}"
+		      command="yui-compressor '${dir.assets}/all.css' -o '${dir.assets}/all-${version}.min.css'"
+		      checkreturn="true" />
+		
+		<delete file="${dir.assets}/all.css" />
+		
+		<!-- combine js -->
+		<append destFile="${dir.assets}/all.js">
+			<filelist refid="min-scripts" />
+		</append>
+		
+		<!-- minify js -->
+		<echo message="Compressing JS to ${dir.assets}/all-${version}.min.js" />
+		<exec dir="${dir.root}"
+		      command="yui-compressor '${dir.assets}/all.js' -o '${dir.assets}/all-${version}.min.js'"
+		      checkreturn="true" />
+		
+		<delete file="${dir.assets}/all.js" />
+		
+		<!-- copy non-minified assets -->
+		<copy todir="${dir.assets}">
+			<fileset refid="styles" />
+		</copy>
+		<copy todir="${dir.assets}">
+			<fileset refid="scripts" />
+		</copy>
+	</target>
+</project>
